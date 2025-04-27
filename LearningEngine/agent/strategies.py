@@ -1,0 +1,17 @@
+from .base import QLearner, QTable
+from environment import GameEnvironment, GameState, UserAction
+import random
+
+
+class EpsilonGreedyQLearner(QLearner):
+    def __init__(self, game_environment: GameEnvironment, alpha: float, gamma: float, epsilon: float, q_table: QTable | None = None):
+        if not 0 <= epsilon <= 1:
+            raise ValueError("Epsilon must be in diapason [0-1]")
+        super().__init__(game_environment, alpha, gamma, q_table)
+        self._EPSILON = epsilon
+
+    def _choose_action(self, state: GameState) -> UserAction:
+        if random.random() < self._EPSILON or state not in self.Q_TABLE:
+            return UserAction.get_by_random()
+        else:
+            return self.Q_TABLE.get_best_action(state)

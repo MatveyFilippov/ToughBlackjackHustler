@@ -1,4 +1,4 @@
-import os
+import logging
 import pickle
 import numpy as np
 from collections import defaultdict
@@ -50,15 +50,9 @@ class QTable:
     def load(cls, filename: str) -> 'QTable':
         try:
             with open(filename, 'rb') as f:
-                if os.path.getsize(filename) == 0:
-                    return QTable()
-                data = pickle.load(f)
-                return QTable(data)
-        except FileNotFoundError:
-            print(f"Warning: QTable file {filename} not found, creating new QTable")
-            return QTable()
-        except (pickle.PickleError, EOFError) as e:
-            print(f"Warning: Error loading QTable from {filename} ({str(e)}), creating new QTable")
+                return QTable(pickle.load(f))
+        except (pickle.PickleError, EOFError, FileNotFoundError):
+            logging.warning(f"Error loading QTable from {filename}, creating new QTable", exc_info=True)
             return QTable()
 
 

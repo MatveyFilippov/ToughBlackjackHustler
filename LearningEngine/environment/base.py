@@ -1,7 +1,10 @@
 import random
 from abc import ABC, abstractmethod
 from enum import Enum
+from functools import lru_cache
 from typing import NamedTuple
+import numpy as np
+from sortedcontainers import SortedList
 
 
 class Card:
@@ -9,6 +12,7 @@ class Card:
         if not 2 <= rank <= 10:
             raise ValueError(f"Invalid rank. Available only [2-10]")
         self._rank = rank
+        self._hash = None
 
     @property
     def rank(self) -> int:
@@ -52,7 +56,9 @@ class Card:
         return NotImplemented
 
     def __hash__(self):
-        return hash(self._rank)
+        if self._hash is None:
+            self._hash = hash(self._rank)
+        return self._hash
 
     def __str__(self):
         return f"Card(rank='{self._rank}')"
@@ -60,43 +66,79 @@ class Card:
     def __repr__(self):
         return f"Card(rank='{self._rank}')"
 
+    def __copy__(self) -> 'Card':
+        return Card(self._rank)
+
+    def copy(self) -> 'Card':
+        return self.__copy__()
+
 
 class AceCard(Card):
     def __init__(self, is_soft: bool | None = True):
         super().__init__(7)
         self._rank = 11 if is_soft else 1
 
+    @property
+    def is_soft(self) -> bool:
+        return self._rank == 11
+
     def set_hard(self):
-        self._rank = 1
+        if self.is_soft:
+            self._rank = 1
+            self._hash = None
+
+    def __copy__(self) -> 'AceCard':
+        return AceCard(self.is_soft)
+
+    def copy(self) -> 'AceCard':
+        return self.__copy__()
 
 
 class CardDeck:
-    __DEFAULT_DECK: list[Card] = [
-        Card(__rank) for __rank in range(2, 11) for _ in range(4)  # Numbered Cards (2–10)
-    ] + [
-        Card(10) for _ in range(3*4)  # Face Cards (J, Q, K)
-    ] + [
-        AceCard() for _ in range(4)  # Ace Cards
-    ]
+    @staticmethod
+    @lru_cache
+    def __get_default_deck(qty: int) -> list[Card]:
+        return sorted(np.repeat(
+            [Card(__rank) for __rank in range(2, 11)] + [Card(10) for _ in range(3)] + [AceCard()], 4 * qty
+        ))
 
-    def __init__(self, qty: int | None = 1):
+    def __new__(cls, qty: int | None = 1):
         if qty < 1:
             raise ValueError("QTY of decks must be greater than 0")
-        self.__deck = self.__DEFAULT_DECK * qty
-        random.shuffle(self.__deck)
-        self.__init_decks_qty = qty
-        self.__min_cards_qty = self.__len__() * 0.25
+        __obj = super().__new__(cls)
+        __obj.__init_decks_qty = qty
+        __obj.__min_cards_qty = 52 * qty * 0.25
+        return __obj
+
+    def __init__(self, qty: int | None = 1):
+        self.__deck: SortedList[Card] = SortedList(self.__get_default_deck(qty))
+
+    def reset(self):
+        self.__deck.clear()
+        self.__deck.update(self.__get_default_deck(self.__init_decks_qty))
+
+    def draw(self) -> Card:
+        cards_remain = self.__len__()
+        if cards_remain == 0:
+            raise IndexError("All cards in the deck have already been used.")
+        return self.__deck.pop(random.randint(0, cards_remain - 1)).copy()
+
+    def __contains__(self, item) -> bool:
+        if isinstance(item, Card):
+            return item in self.__deck
+        return NotImplemented
 
     def __len__(self):
         return len(self.__deck)
 
     def __hash__(self):
-        return hash(sum(card.rank for card in self.__deck))
+        return hash(tuple(self.__deck))
 
-    def draw(self) -> Card:
-        if self.__len__() == 0:
-            raise IndexError("All cards in the deck have already been used.")
-        return self.__deck.pop()
+    def __iter__(self):
+        return (card.copy() for card in self.__deck)
+
+    def count(self, card: Card) -> int:
+        return self.__deck.count(card)
 
     @property
     def init_decks_qty(self) -> int:
@@ -108,14 +150,13 @@ class CardDeck:
 
     @property
     def remaining_cards(self) -> list[Card]:
-        return self.__deck.copy()
+        return list(card.copy() for card in self.__deck)
 
     @classmethod
     def of(cls, init_decks_qty: int, remaining_cards: list[Card]) -> 'CardDeck':
-        deck = cls(init_decks_qty)
-        deck.__deck = remaining_cards.copy()
-        random.shuffle(deck.__deck)
-        return deck
+        obj = cls.__new__(cls, init_decks_qty)
+        obj.__deck = SortedList(AceCard() if isinstance(card, AceCard) else card.copy() for card in remaining_cards)
+        return obj
 
 
 class CardHand:
@@ -132,10 +173,10 @@ class CardHand:
         return self.__cards[index]
 
     def __iter__(self):
-        return (card for card in self.__cards)
+        return (card.copy() for card in self.__cards)
 
     def __hash__(self):
-        return hash(sum(self))
+        return hash(tuple(sorted(self.__cards)))
 
     def __eq__(self, other):
         if isinstance(other, CardHand):
@@ -170,13 +211,11 @@ class CardHand:
         if not self.is_soft:
             return
         for card in self.__cards:
-            if isinstance(card, AceCard):
+            if isinstance(card, AceCard) and sum(self) > 21:
                 card.set_hard()
-                if sum(self) <= 21:
-                    break
 
     def add(self, *cards: Card):
-        self.__cards.extend(cards)
+        self.__cards.extend(AceCard() if isinstance(card, AceCard) else card.copy() for card in cards)
         self.__migrate_to_hard_if_needed()
 
 
@@ -193,6 +232,9 @@ class UserAction(Enum):
 
 
 class AgentReward(float):
+    # def __new__(cls, value):
+    #     return float(value)
+
     NEUTRAL = 0.0
 
 

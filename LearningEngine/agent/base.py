@@ -7,13 +7,14 @@ from abc import ABC, abstractmethod
 
 
 class QTable:
-    __DEFAULT_INIT = lambda key: np.full(len(UserAction), AgentReward.NEUTRAL)
+    __DEFAULT_INIT = (lambda key: np.full(len(UserAction), AgentReward.NEUTRAL))
 
     def __init__(self, _from: dict[GameState, dict[UserAction, AgentReward]] | None = None):
-        self.__table = defaultdict(self.__DEFAULT_INIT, {
-            state: {act.value: float(rew) for act, rew in action_reward_dict.items()}
-            for state, action_reward_dict in _from.items()
-        }) if _from else defaultdict(self.__DEFAULT_INIT)
+        self.__table: dict[GameState, np.ndarray] = defaultdict(self.__DEFAULT_INIT)
+        if _from:
+            for state, action_reward in _from.items():
+                for action, reward in action_reward.items():
+                    self.set_q_value(state, action, reward)
 
     def set_q_value(self, state: GameState, action: UserAction, value: AgentReward):
         self.__table[state][action.value] = float(value)
@@ -30,13 +31,16 @@ class QTable:
     def __contains__(self, state: GameState) -> bool:
         return state in self.__table
 
+    def __len__(self) -> int:
+        return len(self.__table)
+
     def to_dict(self) -> dict[GameState, dict[UserAction, AgentReward]]:
         return {
             state: {
-                UserAction(action_idx): AgentReward(float(reward))
-                for action_idx, reward in enumerate(action_reward_list)
+                UserAction(action): AgentReward(rewards[action.value])
+                for action in UserAction
             }
-            for state, action_reward_list in dict(self.__table).items()
+            for state, rewards in self.__table.items()
         }
 
     def copy(self) -> 'QTable':

@@ -13,11 +13,15 @@ class DefaultGameState(GameState):
     dealer_cards_sum_less_than_17_probability: float  # [0-1]
     dealer_busting_probability: float  # [0-1]
 
+    @staticmethod
+    def round_probability(probability: float) -> float:
+        return round(probability, 3)
+
 
 @lru_cache
 def __calculate_hand_sum_over_by_next_card_probability(deck: CardDeck, hand: CardHand, over: int) -> float:
     not_bust_rank = over - sum(hand)
-    return sum(1 for card in deck.remaining_cards if card.rank > not_bust_rank) / len(deck)
+    return sum(1 for card in deck if card.rank > not_bust_rank) / len(deck)
 
 
 def _calculate_player_busting_probability(deck: CardDeck, hand: CardHand) -> float:
@@ -62,14 +66,13 @@ def __simulate_dealer(deck: CardDeck, hand: CardHand) -> tuple[int, int]:
     total_bust = 0
     total_possibilities = 0
 
-    remaining_cards = deck.remaining_cards
-    for card in set(remaining_cards):
-        card_count = remaining_cards.count(card)
+    for card in set(deck):
+        card_count = deck.count(card)
 
         new_hand = CardHand(*hand)
         new_hand.add(card)
 
-        new_deck_cards = remaining_cards.copy()
+        new_deck_cards = deck.remaining_cards
         new_deck_cards.remove(card)
         new_deck = CardDeck.of(deck.init_decks_qty, new_deck_cards)
 
@@ -91,13 +94,12 @@ class DefaultGameAgentRewards:
 
 class DefaultGame(GameEnvironment):
     def __init__(self, card_decks_qty: int):
-        self.__CARD_DECKS_QTY = card_decks_qty
-        self.__CARD_DECK: CardDeck = None
+        self.__CARD_DECK: CardDeck = CardDeck(card_decks_qty)
         self.__PLAYER_HAND: CardHand = None
         self.__DEALER_HAND: CardHand = None
 
     def reset(self):
-        self.__CARD_DECK = CardDeck(self.__CARD_DECKS_QTY)
+        self.__CARD_DECK.reset()
         self.__start_new_round()
 
     def __start_new_round(self):
@@ -146,15 +148,15 @@ class DefaultGame(GameEnvironment):
         return DefaultGameState(
             player_cards_qty=len(self.__PLAYER_HAND),
             player_cards_sum=sum(self.__PLAYER_HAND),
-            player_has_soft_hand=1 if self.__PLAYER_HAND.is_soft else 0,
-            player_busting_probability=_calculate_player_busting_probability(
+            player_has_soft_hand=int(self.__PLAYER_HAND.is_soft),
+            player_busting_probability=DefaultGameState.round_probability(_calculate_player_busting_probability(
                 deck=self.__CARD_DECK, hand=self.__PLAYER_HAND,
-            ),
+            )),
             dealer_open_card=self.__DEALER_HAND[0].rank,
-            dealer_cards_sum_less_than_17_probability=_calculate_dealer_cards_sum_less_than_17_probability(
+            dealer_cards_sum_less_than_17_probability=DefaultGameState.round_probability(_calculate_dealer_cards_sum_less_than_17_probability(
                 deck=self.__CARD_DECK, hand=self.__DEALER_HAND,
-            ),
-            dealer_busting_probability=_calculate_dealer_busting_probability(
+            )),
+            dealer_busting_probability=DefaultGameState.round_probability(_calculate_dealer_busting_probability(
                 deck=self.__CARD_DECK, hand=self.__DEALER_HAND,
-            ),
+            )),
         )

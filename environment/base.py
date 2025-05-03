@@ -218,6 +218,9 @@ class CardHand:
         self.__cards.extend(AceCard() if isinstance(card, AceCard) else card.copy() for card in cards)
         self.__migrate_to_hard_if_needed()
 
+    def clean(self):
+        self.__cards.clear()
+
 
 class UserAction(Enum):
     STAND = 0

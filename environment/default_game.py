@@ -95,16 +95,20 @@ class DefaultGameAgentRewards:
 class DefaultGame(GameEnvironment):
     def __init__(self, card_decks_qty: int):
         self.__CARD_DECK: CardDeck = CardDeck(card_decks_qty)
-        self.__PLAYER_HAND: CardHand = None
-        self.__DEALER_HAND: CardHand = None
+        self.__PLAYER_HAND: CardHand = CardHand()
+        self.__DEALER_HAND: CardHand = CardHand()
+        self.__is_round_playing: bool = False
 
     def reset(self):
         self.__CARD_DECK.reset()
         self.__start_new_round()
 
     def __start_new_round(self):
-        self.__PLAYER_HAND = CardHand(self.__CARD_DECK.draw(), self.__CARD_DECK.draw())
-        self.__DEALER_HAND = CardHand(self.__CARD_DECK.draw(), self.__CARD_DECK.draw())
+        self.__PLAYER_HAND.clean()
+        self.__PLAYER_HAND.add(self.__CARD_DECK.draw(), self.__CARD_DECK.draw())
+
+        self.__DEALER_HAND.clean()
+        self.__DEALER_HAND.add(self.__CARD_DECK.draw(), self.__CARD_DECK.draw())
 
     def __play_hit(self) -> tuple[AgentReward, bool]:
         self.__PLAYER_HAND.add(self.__CARD_DECK.draw())
@@ -135,13 +139,14 @@ class DefaultGame(GameEnvironment):
             reward = self.__play_stand()
             is_round_over = True
 
+        self.__is_round_playing = not is_round_over
         if is_round_over:
             self.__start_new_round()
         return reward
 
     @property
     def is_terminated(self) -> bool:
-        return not self.__CARD_DECK.is_playable
+        return not self.__is_round_playing and not self.__CARD_DECK.is_playable
 
     @property
     def state(self) -> DefaultGameState:

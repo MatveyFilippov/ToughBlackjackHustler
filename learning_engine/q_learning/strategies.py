@@ -11,7 +11,7 @@ class EpsilonGreedyQLearner(QLearner):
         self._EPSILON = epsilon
 
     def _choose_action(self, state: GameState) -> UserAction:
-        if random.random() < self._EPSILON or state not in self.Q_TABLE:
+        if state not in self.Q_TABLE or random.random() < self._EPSILON:
             return UserAction.get_by_random()
         else:
             return self.Q_TABLE.get_best_action(state)

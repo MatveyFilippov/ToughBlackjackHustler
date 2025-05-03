@@ -2,13 +2,13 @@ import logging
 import sys
 import signal
 import threading
-from agent import QTable
-from agent.strategies import EpsilonGreedyQLearner
+from learning_engine.q_learning import QTable
+from learning_engine.q_learning.strategies import EpsilonGreedyQLearner
 from environment.default_game import DefaultGame
 
 
 logging.basicConfig(
-    level=logging.INFO, filename=f"LearningEngine.log", encoding="UTF-8", datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.INFO, filename=f"TrainQTable.log", encoding="UTF-8", datefmt="%Y-%m-%d %H:%M:%S",
     format="\n'%(name)s':\n%(levelname)s %(asctime)s --> %(message)s"
 )
 

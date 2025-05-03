@@ -26,9 +26,9 @@ sys.excepthook = handle_exception
 Q_TABLE_FILEPATH = "q_table.tbjh"
 LEARNER = EpsilonGreedyQLearner(
     game_environment=DefaultGame(card_decks_qty=4),
-    alpha=0.7,
+    alpha=0.45,
     gamma=0.9,
-    epsilon=0.5,
+    epsilon=0.1,
     q_table=QTable.load(Q_TABLE_FILEPATH),
 )
 

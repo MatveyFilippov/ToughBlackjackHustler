@@ -3,5 +3,5 @@
 __pycache__/
 /venv/
 /playground.py
-/q_table.tbjh
+*.tbjh
 *.log

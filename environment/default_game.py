@@ -1,6 +1,4 @@
-from .base import (
-    GameState, GameEnvironment, AgentAction, AgentReward, CardDeck, CardHand
-)
+from .base import GameState, GameEnvironment, AgentAction, AgentReward, CardDeck, CardHand
 from functools import lru_cache
 
 

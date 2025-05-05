@@ -1,10 +1,10 @@
-import logging
-import sys
-import signal
-import threading
+from environment.default_game import DefaultGame
 from learning_engine.q_learning import QTable
 from learning_engine.q_learning.strategies import EpsilonGreedyQLearner
-from environment.default_game import DefaultGame
+import logging
+import signal
+import sys
+import threading
 
 
 logging.basicConfig(
@@ -21,7 +21,6 @@ def handle_exception(exc_type, exc_value, exc_traceback):
 
 
 sys.excepthook = handle_exception
-
 
 Q_TABLE_FILEPATH = "q_table.tbjh"
 LEARNER = EpsilonGreedyQLearner(

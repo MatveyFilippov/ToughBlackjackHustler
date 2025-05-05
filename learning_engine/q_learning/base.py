@@ -1,9 +1,9 @@
 from environment import GameEnvironment, GameState, AgentAction, AgentReward
 import pickle
+from abc import ABC, abstractmethod
+from collections import defaultdict
 from typing import Callable
 import numpy as np
-from collections import defaultdict
-from abc import ABC, abstractmethod
 
 
 class QTable:

@@ -1,8 +1,8 @@
 from ..base import QTable
 from environment import GameState, AgentAction, AgentReward
 from abc import ABC, abstractmethod
-from typing import Callable
 from statistics import mode, median
+from typing import Callable
 from progress.bar import Bar
 
 

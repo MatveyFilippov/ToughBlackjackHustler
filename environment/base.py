@@ -1,6 +1,6 @@
 import random
 from abc import ABC, abstractmethod
-from enum import Enum
+from enum import Enum, auto
 from functools import lru_cache
 from typing import NamedTuple
 import numpy as np
@@ -222,16 +222,17 @@ class CardHand:
         self.__cards.clear()
 
 
-class UserAction(Enum):
-    STAND = 0
-    HIT = 1
-    __actions: list['UserAction'] = None
+class AgentAction(Enum):
+    STAND = auto()
+    HIT = auto()
+    SPLIT = auto()
+    DOUBLE_DOWN = auto()
+    INSURANCE = auto()
+    SURRENDER = auto()
 
     @classmethod
-    def get_by_random(cls) -> 'UserAction':
-        if not cls.__actions:
-            cls.__actions = list(UserAction)
-        return random.choice(cls.__actions)
+    def get_by_random(cls, *actions: 'AgentAction') -> 'AgentAction':
+        return random.choice(actions)
 
 
 class AgentReward(float):
@@ -245,12 +246,17 @@ GameState = NamedTuple
 
 
 class GameEnvironment(ABC):
+    @property
+    @abstractmethod
+    def available_actions(self) -> tuple[AgentAction, ...]:
+        pass
+
     @abstractmethod
     def reset(self):
         pass
 
     @abstractmethod
-    def play(self, user_action: UserAction) -> AgentReward:
+    def play(self, agent_action: AgentAction) -> AgentReward:
         pass
 
     @property

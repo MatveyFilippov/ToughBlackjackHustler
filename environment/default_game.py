@@ -1,5 +1,5 @@
 from .base import (
-    GameState, GameEnvironment, UserAction, AgentReward, CardDeck, CardHand
+    GameState, GameEnvironment, AgentAction, AgentReward, CardDeck, CardHand
 )
 from functools import lru_cache
 
@@ -94,10 +94,17 @@ class DefaultGameAgentRewards:
 
 class DefaultGame(GameEnvironment):
     def __init__(self, card_decks_qty: int):
+        self.__AVAILABLE_ACTIONS = (AgentAction.STAND, AgentAction.HIT)
+
         self.__CARD_DECK: CardDeck = CardDeck(card_decks_qty)
         self.__PLAYER_HAND: CardHand = CardHand()
         self.__DEALER_HAND: CardHand = CardHand()
+
         self.__is_round_playing: bool = False
+
+    @property
+    def available_actions(self) -> tuple[AgentAction, ...]:
+        return self.__AVAILABLE_ACTIONS
 
     def reset(self):
         self.__CARD_DECK.reset()
@@ -129,15 +136,14 @@ class DefaultGame(GameEnvironment):
         elif self.__DEALER_HAND > self.__PLAYER_HAND:
             return DefaultGameAgentRewards.LOSS
 
-    def play(self, user_action: UserAction) -> AgentReward:
-        reward = AgentReward.NEUTRAL
-        is_round_over = False
-
-        if user_action == UserAction.HIT:
+    def play(self, agent_action: AgentAction) -> AgentReward:
+        if agent_action == AgentAction.HIT:
             reward, is_round_over = self.__play_hit()
-        elif user_action == UserAction.STAND:
+        elif agent_action == AgentAction.STAND:
             reward = self.__play_stand()
             is_round_over = True
+        else:
+            raise ValueError(f"Invalid AgentAction, available only: {self.__AVAILABLE_ACTIONS}")
 
         self.__is_round_playing = not is_round_over
         if is_round_over:

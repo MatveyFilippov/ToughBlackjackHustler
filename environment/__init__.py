@@ -1,4 +1,4 @@
 from .base import (
-    UserAction, AgentReward, GameEnvironment, GameState
+    AgentAction, AgentReward, GameEnvironment, GameState
 )
 from . import default_game

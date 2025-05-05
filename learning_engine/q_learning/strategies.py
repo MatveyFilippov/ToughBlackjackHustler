@@ -1,5 +1,5 @@
 from .base import QLearner, QTable
-from environment import GameEnvironment, GameState, UserAction
+from environment import GameEnvironment, GameState, AgentAction
 import random
 
 
@@ -10,8 +10,8 @@ class EpsilonGreedyQLearner(QLearner):
         super().__init__(game_environment, alpha, gamma, q_table)
         self._EPSILON = epsilon
 
-    def _choose_action(self, state: GameState) -> UserAction:
+    def _choose_action(self, state: GameState) -> AgentAction:
         if state not in self.Q_TABLE or random.random() < self._EPSILON:
-            return UserAction.get_by_random()
+            return AgentAction.get_by_random(*self._GAME_ENVIRONMENT.available_actions)
         else:
             return self.Q_TABLE.get_best_action(state)

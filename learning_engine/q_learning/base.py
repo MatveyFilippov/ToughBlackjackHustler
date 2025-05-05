@@ -1,29 +1,50 @@
-import logging
+from environment import GameEnvironment, GameState, AgentAction, AgentReward
 import pickle
+from typing import Callable
 import numpy as np
 from collections import defaultdict
-from environment import GameEnvironment, GameState, UserAction, AgentReward
 from abc import ABC, abstractmethod
 
 
 class QTable:
-    __DEFAULT_INIT = (lambda key: np.full(len(UserAction), AgentReward.NEUTRAL))
+    __DEFAULT_INIT: dict[tuple[AgentAction, ...], Callable[[GameState], np.ndarray]] = {}
 
-    def __init__(self, _from: dict[GameState, dict[UserAction, AgentReward]] | None = None):
-        self.__table: dict[GameState, np.ndarray] = defaultdict(self.__DEFAULT_INIT)
+    @classmethod
+    def __get_default_init(cls, *available_actions: AgentAction):
+        return cls.__DEFAULT_INIT.setdefault(available_actions, (
+            lambda: np.full(len(available_actions), AgentReward.NEUTRAL)
+        ))
+
+    def __init__(self, *available_actions: AgentAction, _from: dict[GameState, dict[AgentAction, AgentReward]] | None = None):
+        if len(available_actions) < 2:
+            raise ValueError("Q-Table must provide 2 or more AgentAction")
+        self.__available_actions = available_actions
+
+        self.__table: dict[GameState, np.ndarray] = defaultdict(self.__get_default_init(*self.__available_actions))
+
+        self.__action_to_index: dict[AgentAction, int] = {}
+        self.__index_to_action: dict[int, AgentAction] = {}
+        for index, action in enumerate(self.__available_actions):
+            self.__action_to_index[action] = index
+            self.__index_to_action[index] = action
+
         if _from:
             for state, action_reward in _from.items():
                 for action, reward in action_reward.items():
                     self.set_q_value(state, action, reward)
 
-    def set_q_value(self, state: GameState, action: UserAction, value: AgentReward):
-        self.__table[state][action.value] = float(value)
+    @property
+    def available_actions(self) -> tuple[AgentAction, ...]:
+        return self.__available_actions
 
-    def get_q_value(self, state: GameState, action: UserAction) -> AgentReward:
-        return AgentReward(self.__table[state][action.value])
+    def set_q_value(self, state: GameState, action: AgentAction, value: AgentReward):
+        self.__table[state][self.__action_to_index[action]] = float(value)
 
-    def get_best_action(self, state: GameState) -> UserAction:
-        return UserAction(np.argmax(self.__table[state]))
+    def get_q_value(self, state: GameState, action: AgentAction) -> AgentReward:
+        return AgentReward(self.__table[state][self.__action_to_index[action]])
+
+    def get_best_action(self, state: GameState) -> AgentAction:
+        return self.__index_to_action[np.argmax(self.__table[state])]
 
     def get_max_q_value(self, state: GameState) -> AgentReward:
         return AgentReward(np.max(self.__table[state]))
@@ -34,30 +55,34 @@ class QTable:
     def __len__(self) -> int:
         return len(self.__table)
 
-    def to_dict(self) -> dict[GameState, dict[UserAction, AgentReward]]:
+    def to_dict(self) -> dict[GameState, dict[AgentAction, AgentReward]]:
         return {
             state: {
-                UserAction(action): AgentReward(rewards[action.value])
-                for action in UserAction
+                action: AgentReward(rewards[index])
+                for action, index in self.__action_to_index.items()
             }
             for state, rewards in self.__table.items()
         }
 
     def copy(self) -> 'QTable':
-        return QTable(self.to_dict())
+        return QTable(*self.__available_actions, _from=self.to_dict())
 
     def save(self, filename: str):
+        dict_to_save = {
+            "available_actions": self.__available_actions,
+            "q_table": self.to_dict(),
+        }
         with open(filename, 'wb') as f:
-            pickle.dump(self.to_dict(), f)
+            pickle.dump(dict_to_save, f)
 
     @classmethod
     def load(cls, filename: str) -> 'QTable':
         try:
             with open(filename, 'rb') as f:
-                return QTable(pickle.load(f))
+                saved_dict = pickle.load(f)
+                return QTable(*saved_dict["available_actions"], _from=saved_dict["q_table"])
         except (pickle.PickleError, EOFError, FileNotFoundError):
-            logging.warning(f"Error loading QTable from {filename}, creating new QTable", exc_info=True)
-            return QTable()
+            raise SystemError(f"Error loading Q-Table from {filename}")
 
 
 class QLearner(ABC):
@@ -69,14 +94,14 @@ class QLearner(ABC):
             raise ValueError("Gamma must be in diapason [0-1]")
         self._GAMMA = gamma
 
-        self.Q_TABLE = q_table if q_table else QTable()
+        self.Q_TABLE = q_table if q_table else QTable(*game_environment.available_actions)
         self._GAME_ENVIRONMENT = game_environment
 
     @abstractmethod
-    def _choose_action(self, state: GameState) -> UserAction:
+    def _choose_action(self, state: GameState) -> AgentAction:
         pass
 
-    def _update_q_table(self, state: GameState, action: UserAction, reward: AgentReward, next_state: GameState):
+    def _update_q_table(self, state: GameState, action: AgentAction, reward: AgentReward, next_state: GameState):
         current_q = self.Q_TABLE.get_q_value(state, action)
         max_next_q = self.Q_TABLE.get_max_q_value(next_state)
         new_q = AgentReward(current_q + self._ALPHA * (reward + self._GAMMA * max_next_q - current_q))

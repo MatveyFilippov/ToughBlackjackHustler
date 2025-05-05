@@ -6,7 +6,7 @@ from typing import Callable
 import numpy as np
 
 
-class AgentReward(float):
+class QValue(float):
     # def __new__(cls, value):
     #     return float(value)
 
@@ -19,10 +19,10 @@ class QTable:
     @classmethod
     def __get_default_init(cls, *available_actions: GameAction):
         return cls.__DEFAULT_INIT.setdefault(available_actions, (
-            lambda: np.full(len(available_actions), AgentReward.NEUTRAL)
+            lambda: np.full(len(available_actions), QValue.NEUTRAL)
         ))
 
-    def __init__(self, *available_actions: GameAction, _from: dict[GameState, dict[GameAction, AgentReward]] | None = None):
+    def __init__(self, *available_actions: GameAction, _from: dict[GameState, dict[GameAction, QValue]] | None = None):
         if len(available_actions) < 2:
             raise ValueError("Q-Table must provide 2 or more GameAction")
         self.__available_actions = available_actions
@@ -36,25 +36,25 @@ class QTable:
             self.__index_to_action[index] = action
 
         if _from:
-            for state, action_reward in _from.items():
-                for action, reward in action_reward.items():
-                    self.set_q_value(state, action, reward)
+            for state, action_value in _from.items():
+                for action, value in action_value.items():
+                    self.set_q_value(state, action, value)
 
     @property
     def available_actions(self) -> tuple[GameAction, ...]:
         return self.__available_actions
 
-    def set_q_value(self, state: GameState, action: GameAction, value: AgentReward):
+    def set_q_value(self, state: GameState, action: GameAction, value: QValue):
         self.__table[state][self.__action_to_index[action]] = float(value)
 
-    def get_q_value(self, state: GameState, action: GameAction) -> AgentReward:
-        return AgentReward(self.__table[state][self.__action_to_index[action]])
+    def get_q_value(self, state: GameState, action: GameAction) -> QValue:
+        return QValue(self.__table[state][self.__action_to_index[action]])
 
     def get_best_action(self, state: GameState) -> GameAction:
         return self.__index_to_action[np.argmax(self.__table[state])]
 
-    def get_max_q_value(self, state: GameState) -> AgentReward:
-        return AgentReward(np.max(self.__table[state]))
+    def get_max_q_value(self, state: GameState) -> QValue:
+        return QValue(np.max(self.__table[state]))
 
     def __contains__(self, state: GameState) -> bool:
         return state in self.__table
@@ -62,10 +62,10 @@ class QTable:
     def __len__(self) -> int:
         return len(self.__table)
 
-    def to_dict(self) -> dict[GameState, dict[GameAction, AgentReward]]:
+    def to_dict(self) -> dict[GameState, dict[GameAction, QValue]]:
         return {
             state: {
-                action: AgentReward(rewards[index])
+                action: QValue(rewards[index])
                 for action, index in self.__action_to_index.items()
             }
             for state, rewards in self.__table.items()
@@ -92,6 +92,12 @@ class QTable:
             raise SystemError(f"Error loading Q-Table from {filename}")
 
 
+class QLearnerRewardAfterAction(float):
+    # def __new__(cls, value):
+    #     return float(value)
+    pass
+
+
 class QLearner(ABC):
     def __init__(self, game_environment: GameEnvironment, alpha: float, gamma: float, q_table: QTable | None = None):
         if not 0 <= alpha <= 1:
@@ -109,13 +115,13 @@ class QLearner(ABC):
         pass
 
     @abstractmethod
-    def _get_reward_for_action_result(self, action_result: GameActionResult) -> AgentReward:
+    def _get_reward_for_action_result(self, action_result: GameActionResult) -> QLearnerRewardAfterAction:
         pass
 
-    def _update_q_table(self, state: GameState, action: GameAction, reward: AgentReward, next_state: GameState):
+    def _update_q_table(self, state: GameState, action: GameAction, reward: QLearnerRewardAfterAction, next_state: GameState):
         current_q = self.Q_TABLE.get_q_value(state, action)
         max_next_q = self.Q_TABLE.get_max_q_value(next_state)
-        new_q = AgentReward(current_q + self._ALPHA * (reward + self._GAMMA * max_next_q - current_q))
+        new_q = QValue(current_q + self._ALPHA * (reward + self._GAMMA * max_next_q - current_q))
         self.Q_TABLE.set_q_value(state, action, new_q)
 
     def train(self, episodes: int):

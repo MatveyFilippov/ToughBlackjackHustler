@@ -1,11 +1,11 @@
-from .base import QLearner, QTable, AgentReward
+from .base import QLearner, QTable, QLearnerRewardAfterAction
 from environment import GameEnvironment, GameState, GameAction, GameActionResult
 import random
 
 
 class EpsilonGreedyQLearner(QLearner):
     def __init__(self, game_environment: GameEnvironment, alpha: float, gamma: float, epsilon: float,
-                 rewards: dict[GameActionResult, AgentReward], q_table: QTable | None = None):
+                 rewards: dict[GameActionResult, QLearnerRewardAfterAction], q_table: QTable | None = None):
         if not 0 <= epsilon <= 1:
             raise ValueError("Epsilon must be in diapason [0-1]")
         self._EPSILON = epsilon
@@ -23,5 +23,5 @@ class EpsilonGreedyQLearner(QLearner):
         else:
             return self.Q_TABLE.get_best_action(state)
 
-    def _get_reward_for_action_result(self, action_result: GameActionResult) -> AgentReward:
+    def _get_reward_for_action_result(self, action_result: GameActionResult) -> QLearnerRewardAfterAction:
         return self._REWARDS[action_result]

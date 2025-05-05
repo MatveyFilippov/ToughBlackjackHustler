@@ -1,4 +1,4 @@
-from ..base import AgentReward, QTable
+from ..base import QValue, QTable
 from environment import GameState, GameAction
 from abc import ABC, abstractmethod
 from statistics import mode, median
@@ -37,7 +37,7 @@ class QTableNarrower:
         self._ORIGIN = q_table.to_dict()
         self._AVAILABLE_ACTIONS = q_table.available_actions
 
-        self.__STATES_TO_NARROW_DOWN: dict[GameState, dict[GameAction, list[AgentReward]]] = {}
+        self.__STATES_TO_NARROW_DOWN: dict[GameState, dict[GameAction, list[QValue]]] = {}
 
     @abstractmethod
     def _export_old_state_to_new(self, old_state: GameState) -> GameState:
@@ -46,45 +46,45 @@ class QTableNarrower:
     def __compute_states_to_narrow_down_if_clean(self):
         if self.__STATES_TO_NARROW_DOWN:
             return
-        for old_state, old_table in self._ORIGIN.items():
+        for old_state, old_action_values in self._ORIGIN.items():
             new_state = self._export_old_state_to_new(old_state)
             if new_state not in self.__STATES_TO_NARROW_DOWN:
                 self.__STATES_TO_NARROW_DOWN[new_state] = {act: [] for act in self._AVAILABLE_ACTIONS}
-            for act, rew in old_table.items():
-                self.__STATES_TO_NARROW_DOWN[new_state][act].append(rew)
+            for act, val in old_action_values.items():
+                self.__STATES_TO_NARROW_DOWN[new_state][act].append(val)
 
-    def _narrow_down(self, mapper: Callable[[GameState, GameAction, list[AgentReward]], AgentReward], ignore_neutral: bool) -> QTable:
+    def _narrow_down(self, mapper: Callable[[GameState, GameAction, list[QValue]], QValue], ignore_neutral: bool) -> QTable:
         self.__compute_states_to_narrow_down_if_clean()
         progress_bar = Bar(
             'Narrow down %(max)d states', max=len(self.__STATES_TO_NARROW_DOWN),
             suffix='%(index)d/%(remaining)d %(percent).2f%% [%(avg)d - %(elapsed)d/%(eta)d]s'
         )
         narrowed_q_table = {}
-        for narrowed_state, old_q_values in self.__STATES_TO_NARROW_DOWN.items():
+        for narrowed_state, old_action_values in self.__STATES_TO_NARROW_DOWN.items():
             new_q_values = {}
-            for action, rewards in old_q_values.items():
-                while ignore_neutral and AgentReward.NEUTRAL in rewards:
-                    rewards.remove(AgentReward.NEUTRAL)
-                new_q_values[action] = mapper(narrowed_state, action, rewards) if len(rewards) > 0 else AgentReward.NEUTRAL
+            for action, values in old_action_values.items():
+                while ignore_neutral and QValue.NEUTRAL in values:
+                    values.remove(QValue.NEUTRAL)
+                new_q_values[action] = mapper(narrowed_state, action, values) if len(values) > 0 else QValue.NEUTRAL
             narrowed_q_table[narrowed_state] = new_q_values
             progress_bar.next()
         progress_bar.finish()
         return QTable(*self._AVAILABLE_ACTIONS, _from=narrowed_q_table)
 
     def average(self, ignore_neutral=True) -> QTable:
-        return self._narrow_down(lambda s, a, rewards: AgentReward(sum(rewards) / len(rewards)), ignore_neutral)
+        return self._narrow_down(lambda s, a, values: QValue(sum(values) / len(values)), ignore_neutral)
 
     def max(self, ignore_neutral=True) -> QTable:
-        return self._narrow_down(lambda s, a, rewards: AgentReward(max(rewards)), ignore_neutral)
+        return self._narrow_down(lambda s, a, values: QValue(max(values)), ignore_neutral)
 
     def moda(self, ignore_neutral=True) -> QTable:
-        return self._narrow_down(lambda s, a, rewards: AgentReward(mode(rewards)), ignore_neutral)
+        return self._narrow_down(lambda s, a, values: QValue(mode(values)), ignore_neutral)
 
     def median(self, ignore_neutral=True) -> QTable:
-        return self._narrow_down(lambda s, a, rewards: AgentReward(median(rewards)), ignore_neutral)
+        return self._narrow_down(lambda s, a, values: QValue(median(values)), ignore_neutral)
 
     def weight_average_by_distance(self, distance_calculator: Callable[[GameState], dict[GameState, float]], ignore_neutral=True) -> QTable:
-        def mapper(narrowed_state: GameState, action: GameAction, r) -> AgentReward:
+        def mapper(narrowed_state: GameState, action: GameAction, v) -> QValue:
             weights = {
                 state: 1.0 / (distance + 1e-5)
                 for state, distance in distance_calculator(narrowed_state).items()
@@ -97,12 +97,12 @@ class QTableNarrower:
 
             for state, weight in weights.items():
                 origin_reward = self._ORIGIN[state][action]
-                if ignore_neutral and origin_reward == AgentReward.NEUTRAL:
+                if ignore_neutral and origin_reward == QValue.NEUTRAL:
                     continue
                 weight = weight / total_weight
                 weighted_sum += origin_reward * weight
                 total_action_weight += weight
 
-            return AgentReward(weighted_sum / total_action_weight) if total_action_weight > 0 else AgentReward.NEUTRAL
+            return QValue(weighted_sum / total_action_weight) if total_action_weight > 0 else QValue.NEUTRAL
 
         return self._narrow_down(mapper, ignore_neutral)

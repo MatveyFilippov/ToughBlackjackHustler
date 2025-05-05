@@ -1,4 +1,4 @@
 from . import strategies, misc_tools
 from .base import (
-    AgentReward, QTable, QLearner,
+    QValue, QTable, QLearnerRewardAfterAction, QLearner,
 )

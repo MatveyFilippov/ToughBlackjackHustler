@@ -54,7 +54,10 @@ def save_and_exit_by_signal(signum, frame):
 def save_by_timer():
     global LEARNER
     LEARNER.Q_TABLE.save(Q_TABLE_FILEPATH)
-    threading.Timer(1800, save_by_timer).start()
+    timer = threading.Timer(1800, save_by_timer)
+    timer.name = "Save Q-Table by timer"
+    timer.daemon = True
+    timer.start()
 
 
 if __name__ == "__main__":

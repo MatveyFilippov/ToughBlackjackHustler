@@ -6,9 +6,9 @@ from typing import Callable
 from progress.bar import Bar
 
 
-class QTableParser(ABC):
+class QTableStatesParser(ABC):
     def __init__(self, q_table: QTable):
-        self._ORIGIN = q_table.to_dict()
+        self._ORIGIN_STATES = list(q_table.to_dict().keys())
         self.__states_with_distance_cache: dict[GameState, dict[GameState, float]] = {}
 
     @abstractmethod

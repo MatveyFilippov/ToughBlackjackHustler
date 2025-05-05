@@ -1,10 +1,10 @@
 from environment import GameState
 from environment.default_game import DefaultGameState
 from learning_engine.q_learning import QTable
-from learning_engine.q_learning.misc_tools import QTableParser, QTableNarrower
+from learning_engine.q_learning.misc_tools import QTableStatesParser, QTableNarrower
 
 
-class QTableParser4DefaultGame(QTableParser):
+class QTableStatesParser4DefaultGame(QTableStatesParser):
     class _ShortDefaultGameState(GameState):
         player_cards_qty: int
         player_cards_sum: int
@@ -13,12 +13,12 @@ class QTableParser4DefaultGame(QTableParser):
 
     def __init__(self, q_table: QTable):
         super().__init__(q_table)
-        self.__NEW_TO_OLD: dict[QTableParser4DefaultGame._ShortDefaultGameState, list[DefaultGameState]] = {}
+        self.__NEW_TO_OLD: dict[QTableStatesParser4DefaultGame._ShortDefaultGameState, list[DefaultGameState]] = {}
 
     def __compute_new_to_old_if_clean(self):
         if self.__NEW_TO_OLD:
             return
-        for full_old_state, old_table in self._ORIGIN.items():
+        for full_old_state in self._ORIGIN_STATES:
             self.__NEW_TO_OLD.setdefault(self._ShortDefaultGameState(
                 player_cards_qty=full_old_state.player_cards_qty,
                 player_cards_sum=full_old_state.player_cards_sum,
@@ -63,7 +63,7 @@ class QTableNarrower4DefaultGame(QTableNarrower):
 
 if __name__ == "__main__":
     origin_q_table = QTable.load("old_q_table.tbjh")
-    parser = QTableParser4DefaultGame(origin_q_table)
+    parser = QTableStatesParser4DefaultGame(origin_q_table)
     narrower = QTableNarrower4DefaultGame(origin_q_table)
     narrowed_q_table = narrower.weight_average_by_distance(parser.get_states_with_distance, ignore_neutral=True)
     narrowed_q_table.save("new_q_table.tbjh")

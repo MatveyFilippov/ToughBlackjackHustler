@@ -15,7 +15,7 @@ class DefaultGameState(GameState):
 
     @staticmethod
     def round_probability(probability: float) -> float:
-        return round(probability, 3)
+        return round(probability, 2)
 
 
 @lru_cache

@@ -1,5 +1,6 @@
+from environment import GameActionResult
 from environment.default_game import DefaultGame
-from learning_engine.q_learning import QTable
+from learning_engine.q_learning import QTable, AgentReward
 from learning_engine.q_learning.strategies import EpsilonGreedyQLearner
 import logging
 import signal
@@ -28,6 +29,14 @@ LEARNER = EpsilonGreedyQLearner(
     alpha=0.45,
     gamma=0.9,
     epsilon=0.1,
+    rewards={
+        GameActionResult.WAIT_ACTION: AgentReward.NEUTRAL,
+        GameActionResult.BLACKJACK: AgentReward(1.5),
+        GameActionResult.WINS: AgentReward(1.0),
+        GameActionResult.PUSH: AgentReward(0.5),
+        GameActionResult.LOSS: AgentReward(-1.0),
+        GameActionResult.BUST: AgentReward(-1.5),
+    },
     q_table=QTable.load(Q_TABLE_FILEPATH),
 )
 

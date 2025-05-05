@@ -1,5 +1,5 @@
-from ..base import QTable
-from environment import GameState, AgentAction, AgentReward
+from ..base import AgentReward, QTable
+from environment import GameState, GameAction
 from abc import ABC, abstractmethod
 from statistics import mode, median
 from typing import Callable
@@ -37,7 +37,7 @@ class QTableNarrower:
         self._ORIGIN = q_table.to_dict()
         self._AVAILABLE_ACTIONS = q_table.available_actions
 
-        self.__STATES_TO_NARROW_DOWN: dict[GameState, dict[AgentAction, list[AgentReward]]] = {}
+        self.__STATES_TO_NARROW_DOWN: dict[GameState, dict[GameAction, list[AgentReward]]] = {}
 
     @abstractmethod
     def _export_old_state_to_new(self, old_state: GameState) -> GameState:
@@ -53,7 +53,7 @@ class QTableNarrower:
             for act, rew in old_table.items():
                 self.__STATES_TO_NARROW_DOWN[new_state][act].append(rew)
 
-    def _narrow_down(self, mapper: Callable[[GameState, AgentAction, list[AgentReward]], AgentReward], ignore_neutral: bool) -> QTable:
+    def _narrow_down(self, mapper: Callable[[GameState, GameAction, list[AgentReward]], AgentReward], ignore_neutral: bool) -> QTable:
         self.__compute_states_to_narrow_down_if_clean()
         progress_bar = Bar(
             'Narrow down %(max)d states', max=len(self.__STATES_TO_NARROW_DOWN),
@@ -84,7 +84,7 @@ class QTableNarrower:
         return self._narrow_down(lambda s, a, rewards: AgentReward(median(rewards)), ignore_neutral)
 
     def weight_average_by_distance(self, distance_calculator: Callable[[GameState], dict[GameState, float]], ignore_neutral=True) -> QTable:
-        def mapper(narrowed_state: GameState, action: AgentAction, r) -> AgentReward:
+        def mapper(narrowed_state: GameState, action: GameAction, r) -> AgentReward:
             weights = {
                 state: 1.0 / (distance + 1e-5)
                 for state, distance in distance_calculator(narrowed_state).items()

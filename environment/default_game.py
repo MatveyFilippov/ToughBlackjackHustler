@@ -1,4 +1,4 @@
-from .base import GameState, GameEnvironment, AgentAction, AgentReward, CardDeck, CardHand
+from .base import GameEnvironment, GameState, GameAction, GameActionResult, CardDeck, CardHand
 from functools import lru_cache
 
 
@@ -82,17 +82,9 @@ def __simulate_dealer(deck: CardDeck, hand: CardHand) -> tuple[int, int]:
     return total_bust, total_possibilities
 
 
-class DefaultGameAgentRewards:
-    BLACKJACK = AgentReward(1.5)
-    WINS = AgentReward(1.0)
-    PUSH = AgentReward(0.5)
-    LOSS = AgentReward(-1.0)
-    BUST = AgentReward(-1.5)
-
-
 class DefaultGame(GameEnvironment):
     def __init__(self, card_decks_qty: int):
-        self.__AVAILABLE_ACTIONS = (AgentAction.STAND, AgentAction.HIT)
+        self.__AVAILABLE_ACTIONS = (GameAction.STAND, GameAction.HIT)
 
         self.__CARD_DECK: CardDeck = CardDeck(card_decks_qty)
         self.__PLAYER_HAND: CardHand = CardHand()
@@ -101,7 +93,7 @@ class DefaultGame(GameEnvironment):
         self.__is_round_playing: bool = False
 
     @property
-    def available_actions(self) -> tuple[AgentAction, ...]:
+    def available_actions(self) -> tuple[GameAction, ...]:
         return self.__AVAILABLE_ACTIONS
 
     def reset(self):
@@ -115,38 +107,38 @@ class DefaultGame(GameEnvironment):
         self.__DEALER_HAND.clean()
         self.__DEALER_HAND.add(self.__CARD_DECK.draw(), self.__CARD_DECK.draw())
 
-    def __play_hit(self) -> tuple[AgentReward, bool]:
+    def __play_hit(self) -> tuple[GameActionResult, bool]:
         self.__PLAYER_HAND.add(self.__CARD_DECK.draw())
         player_sum = sum(self.__PLAYER_HAND)
         if player_sum > 21:
-            return DefaultGameAgentRewards.BUST, True
+            return GameActionResult.BUST, True
         elif player_sum == 21:
-            return DefaultGameAgentRewards.BLACKJACK, True
-        return AgentReward.NEUTRAL, False
+            return GameActionResult.BLACKJACK, True
+        return GameActionResult.WAIT_ACTION, False
 
-    def __play_stand(self) -> AgentReward:
+    def __play_stand(self) -> GameActionResult:
         while sum(self.__DEALER_HAND) < 17:
             self.__DEALER_HAND.add(self.__CARD_DECK.draw())
         if sum(self.__DEALER_HAND) > 21 or self.__DEALER_HAND < self.__PLAYER_HAND:
-            return DefaultGameAgentRewards.WINS
+            return GameActionResult.WINS
         elif self.__DEALER_HAND == self.__PLAYER_HAND:
-            return DefaultGameAgentRewards.PUSH
+            return GameActionResult.PUSH
         elif self.__DEALER_HAND > self.__PLAYER_HAND:
-            return DefaultGameAgentRewards.LOSS
+            return GameActionResult.LOSS
 
-    def play(self, agent_action: AgentAction) -> AgentReward:
-        if agent_action == AgentAction.HIT:
-            reward, is_round_over = self.__play_hit()
-        elif agent_action == AgentAction.STAND:
-            reward = self.__play_stand()
+    def play(self, game_action: GameAction) -> GameActionResult:
+        if game_action == GameAction.HIT:
+            result, is_round_over = self.__play_hit()
+        elif game_action == GameAction.STAND:
+            result = self.__play_stand()
             is_round_over = True
         else:
-            raise ValueError(f"Invalid AgentAction, available only: {self.__AVAILABLE_ACTIONS}")
+            raise ValueError(f"Invalid GameAction, available only: {self.__AVAILABLE_ACTIONS}")
 
         self.__is_round_playing = not is_round_over
         if is_round_over:
             self.__start_new_round()
-        return reward
+        return result
 
     @property
     def is_terminated(self) -> bool:

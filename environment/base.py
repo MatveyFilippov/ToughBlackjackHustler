@@ -222,7 +222,7 @@ class CardHand:
         self.__cards.clear()
 
 
-class AgentAction(Enum):
+class GameAction(Enum):
     STAND = auto()
     HIT = auto()
     SPLIT = auto()
@@ -231,15 +231,17 @@ class AgentAction(Enum):
     SURRENDER = auto()
 
     @classmethod
-    def get_by_random(cls, *actions: 'AgentAction') -> 'AgentAction':
+    def get_by_random(cls, *actions: 'GameAction') -> 'GameAction':
         return random.choice(actions)
 
 
-class AgentReward(float):
-    # def __new__(cls, value):
-    #     return float(value)
-
-    NEUTRAL = 0.0
+class GameActionResult(Enum):
+    WAIT_ACTION = auto()
+    BLACKJACK = auto()
+    WINS = auto()
+    PUSH = auto()
+    LOSS = auto()
+    BUST = auto()
 
 
 GameState = NamedTuple
@@ -248,7 +250,7 @@ GameState = NamedTuple
 class GameEnvironment(ABC):
     @property
     @abstractmethod
-    def available_actions(self) -> tuple[AgentAction, ...]:
+    def available_actions(self) -> tuple[GameAction, ...]:
         pass
 
     @abstractmethod
@@ -256,7 +258,7 @@ class GameEnvironment(ABC):
         pass
 
     @abstractmethod
-    def play(self, agent_action: AgentAction) -> AgentReward:
+    def play(self, game_action: GameAction) -> GameActionResult:
         pass
 
     @property

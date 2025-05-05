@@ -1,4 +1,4 @@
-from environment import GameEnvironment, GameState, AgentAction, AgentReward
+from environment import GameEnvironment, GameState, GameAction, GameActionResult
 import pickle
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -6,24 +6,31 @@ from typing import Callable
 import numpy as np
 
 
+class AgentReward(float):
+    # def __new__(cls, value):
+    #     return float(value)
+
+    NEUTRAL = 0.0
+
+
 class QTable:
-    __DEFAULT_INIT: dict[tuple[AgentAction, ...], Callable[[GameState], np.ndarray]] = {}
+    __DEFAULT_INIT: dict[tuple[GameAction, ...], Callable[[GameState], np.ndarray]] = {}
 
     @classmethod
-    def __get_default_init(cls, *available_actions: AgentAction):
+    def __get_default_init(cls, *available_actions: GameAction):
         return cls.__DEFAULT_INIT.setdefault(available_actions, (
             lambda: np.full(len(available_actions), AgentReward.NEUTRAL)
         ))
 
-    def __init__(self, *available_actions: AgentAction, _from: dict[GameState, dict[AgentAction, AgentReward]] | None = None):
+    def __init__(self, *available_actions: GameAction, _from: dict[GameState, dict[GameAction, AgentReward]] | None = None):
         if len(available_actions) < 2:
-            raise ValueError("Q-Table must provide 2 or more AgentAction")
+            raise ValueError("Q-Table must provide 2 or more GameAction")
         self.__available_actions = available_actions
 
         self.__table: dict[GameState, np.ndarray] = defaultdict(self.__get_default_init(*self.__available_actions))
 
-        self.__action_to_index: dict[AgentAction, int] = {}
-        self.__index_to_action: dict[int, AgentAction] = {}
+        self.__action_to_index: dict[GameAction, int] = {}
+        self.__index_to_action: dict[int, GameAction] = {}
         for index, action in enumerate(self.__available_actions):
             self.__action_to_index[action] = index
             self.__index_to_action[index] = action
@@ -34,16 +41,16 @@ class QTable:
                     self.set_q_value(state, action, reward)
 
     @property
-    def available_actions(self) -> tuple[AgentAction, ...]:
+    def available_actions(self) -> tuple[GameAction, ...]:
         return self.__available_actions
 
-    def set_q_value(self, state: GameState, action: AgentAction, value: AgentReward):
+    def set_q_value(self, state: GameState, action: GameAction, value: AgentReward):
         self.__table[state][self.__action_to_index[action]] = float(value)
 
-    def get_q_value(self, state: GameState, action: AgentAction) -> AgentReward:
+    def get_q_value(self, state: GameState, action: GameAction) -> AgentReward:
         return AgentReward(self.__table[state][self.__action_to_index[action]])
 
-    def get_best_action(self, state: GameState) -> AgentAction:
+    def get_best_action(self, state: GameState) -> GameAction:
         return self.__index_to_action[np.argmax(self.__table[state])]
 
     def get_max_q_value(self, state: GameState) -> AgentReward:
@@ -55,7 +62,7 @@ class QTable:
     def __len__(self) -> int:
         return len(self.__table)
 
-    def to_dict(self) -> dict[GameState, dict[AgentAction, AgentReward]]:
+    def to_dict(self) -> dict[GameState, dict[GameAction, AgentReward]]:
         return {
             state: {
                 action: AgentReward(rewards[index])
@@ -98,10 +105,14 @@ class QLearner(ABC):
         self._GAME_ENVIRONMENT = game_environment
 
     @abstractmethod
-    def _choose_action(self, state: GameState) -> AgentAction:
+    def _choose_action(self, state: GameState) -> GameAction:
         pass
 
-    def _update_q_table(self, state: GameState, action: AgentAction, reward: AgentReward, next_state: GameState):
+    @abstractmethod
+    def _get_reward_for_action_result(self, action_result: GameActionResult) -> AgentReward:
+        pass
+
+    def _update_q_table(self, state: GameState, action: GameAction, reward: AgentReward, next_state: GameState):
         current_q = self.Q_TABLE.get_q_value(state, action)
         max_next_q = self.Q_TABLE.get_max_q_value(next_state)
         new_q = AgentReward(current_q + self._ALPHA * (reward + self._GAMMA * max_next_q - current_q))
@@ -113,7 +124,8 @@ class QLearner(ABC):
             state = self._GAME_ENVIRONMENT.state
             while not self._GAME_ENVIRONMENT.is_terminated:
                 action = self._choose_action(state)
-                reward = self._GAME_ENVIRONMENT.play(action)
+                action_result = self._GAME_ENVIRONMENT.play(action)
+                reward = self._get_reward_for_action_result(action_result)
                 next_state = self._GAME_ENVIRONMENT.state
                 self._update_q_table(state=state, action=action, reward=reward, next_state=next_state)
                 state = next_state

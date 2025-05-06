@@ -2,7 +2,7 @@ import random
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 from functools import lru_cache
-from typing import NamedTuple
+from typing import NamedTuple, Generator
 import numpy as np
 from sortedcontainers import SortedList
 
@@ -134,7 +134,7 @@ class CardDeck:
     def __hash__(self):
         return hash(tuple(self.__deck))
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[Card, None, None]:
         return (card.copy() for card in self.__deck)
 
     def count(self, card: Card) -> int:
@@ -150,7 +150,7 @@ class CardDeck:
 
     @property
     def remaining_cards(self) -> list[Card]:
-        return list(card.copy() for card in self.__deck)
+        return list(self)
 
     @classmethod
     def of(cls, init_decks_qty: int, remaining_cards: list[Card]) -> 'CardDeck':
@@ -172,7 +172,7 @@ class CardHand:
     def __getitem__(self, index) -> Card:
         return self.__cards[index]
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[Card, None, None]:
         return (card.copy() for card in self.__cards)
 
     def __hash__(self):

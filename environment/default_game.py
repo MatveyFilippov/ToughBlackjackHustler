@@ -76,7 +76,7 @@ class DefaultGame(GameEnvironment):
         return GameActionResult.WAIT_ACTION, False
 
     def __play_stand(self) -> GameActionResult:
-        while sum(self.__DEALER_HAND) < 17:
+        while sum(self.__DEALER_HAND) < 17 or (self.__DEALER_HIT_ON_SOFT_17 and self.__DEALER_HAND.is_soft):
             self.__DEALER_HAND.add(self.__CARD_DECK.draw())
         if sum(self.__DEALER_HAND) > 21 or self.__DEALER_HAND < self.__PLAYER_HAND:
             return GameActionResult.WINS

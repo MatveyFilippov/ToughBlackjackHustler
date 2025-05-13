@@ -62,8 +62,9 @@ def save_by_timer():
 
 if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, save_by_signal)  # kill -USR1 <PID>  (ps aux | grep python)
-    signal.signal(signal.SIGUSR1, save_and_exit_by_signal)  # systemctl stop
-    signal.signal(signal.SIGUSR1, save_and_exit_by_signal)  # Ctrl+C
+    signal.signal(signal.SIGTERM, save_and_exit_by_signal)  # systemctl stop
+    # signal.signal(signal.SIGKILL, save_and_exit_by_signal)  # systemctl kill
+    signal.signal(signal.SIGINT, save_and_exit_by_signal)  # Ctrl+C
     save_by_timer()
     try:
         train_iterations = 100

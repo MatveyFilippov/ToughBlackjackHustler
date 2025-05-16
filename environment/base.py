@@ -18,6 +18,9 @@ class Card:
     def rank(self) -> int:
         return self._rank
 
+    def copy(self) -> 'Card':
+        return Card(self._rank)
+
     def __add__(self, other):
         if isinstance(other, Card):
             return self._rank + other._rank
@@ -61,16 +64,7 @@ class Card:
         return self._hash
 
     def __str__(self):
-        return f"Card(rank='{self._rank}')"
-
-    def __repr__(self):
-        return f"Card(rank='{self._rank}')"
-
-    def __copy__(self) -> 'Card':
-        return Card(self._rank)
-
-    def copy(self) -> 'Card':
-        return self.__copy__()
+        return f"Card(rank={self._rank})"
 
 
 class AceCard(Card):
@@ -87,11 +81,11 @@ class AceCard(Card):
             self._rank = 1
             self._hash = None
 
-    def __copy__(self) -> 'AceCard':
+    def copy(self) -> 'AceCard':
         return AceCard(self.is_soft)
 
-    def copy(self) -> 'AceCard':
-        return self.__copy__()
+    def __str__(self):
+        return f"AceCard(is_soft={self.is_soft})"
 
 
 class CardDeck:
@@ -138,7 +132,7 @@ class CardDeck:
         return (card.copy() for card in self.__deck)
 
     def count(self, card: Card) -> int:
-        return self.__deck.count(card)
+        return self.__deck.count(AceCard() if isinstance(card, AceCard) else card)
 
     @property
     def init_decks_qty(self) -> int:
@@ -163,14 +157,14 @@ class CardHand:
     __SOFT_ACE = AceCard(is_soft=True)
 
     def __init__(self, *cards: Card):
-        self.__cards = []
+        self.__cards: list[Card] = []
         self.add(*cards)
 
     def __len__(self):
         return len(self.__cards)
 
     def __getitem__(self, index) -> Card:
-        return self.__cards[index]
+        return self.__cards[index].copy()
 
     def __iter__(self) -> Generator[Card, None, None]:
         return (card.copy() for card in self.__cards)

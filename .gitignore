@@ -5,3 +5,4 @@ __pycache__/
 /playground.py
 *.tbjh
 *.log
+/q_table_backups/

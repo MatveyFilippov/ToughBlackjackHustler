@@ -96,11 +96,11 @@ class QTableNarrower:
             total_action_weight = 0.0
 
             for state, weight in weights.items():
-                origin_reward = self._ORIGIN[state][action]
-                if ignore_neutral and origin_reward == QValue.NEUTRAL:
+                origin_value = self._ORIGIN[state][action]
+                if ignore_neutral and origin_value == QValue.NEUTRAL:
                     continue
                 weight = weight / total_weight
-                weighted_sum += origin_reward * weight
+                weighted_sum += origin_value * weight
                 total_action_weight += weight
 
             return QValue(weighted_sum / total_action_weight) if total_action_weight > 0 else QValue.NEUTRAL

@@ -65,10 +65,10 @@ class QTable:
     def to_dict(self) -> dict[GameState, dict[GameAction, QValue]]:
         return {
             state: {
-                action: QValue(rewards[index])
+                action: QValue(values[index])
                 for action, index in self.__action_to_index.items()
             }
-            for state, rewards in self.__table.items()
+            for state, values in self.__table.items()
         }
 
     def copy(self) -> 'QTable':

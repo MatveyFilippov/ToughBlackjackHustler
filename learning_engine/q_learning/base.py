@@ -89,7 +89,7 @@ class QTable:
                 saved_dict = pickle.load(f)
                 return QTable(*saved_dict["available_actions"], _from=saved_dict["q_table"])
         except (pickle.PickleError, EOFError, FileNotFoundError):
-            raise SystemError(f"Error loading Q-Table from {filename}")
+            raise ValueError(f"Error loading Q-Table from {filename}")
 
 
 class QLearnerRewardAfterAction(float):

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToughBlackjackHustler</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #0a5c36;
+            color: white;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #126b41;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+        h1 {
+            text-align: center;
+            color: #f8d347;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border-radius: 5px;
+            border: none;
+        }
+        button {
+            background-color: #f8d347;
+            color: #0a5c36;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #e6c542;
+        }
+        .recommendation {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #1a844f;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .hit {
+            color: #ff6b6b;
+        }
+        .stand {
+            color: #6bff6b;
+        }
+        .double, .split {
+            color: #6b6bff;
+        }
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .card-display {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .card {
+            background-color: white;
+            color: black;
+            width: 60px;
+            height: 90px;
+            margin: 0 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 5px;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        .dealer-card {
+            background-color: #f8d347;
+        }
+        .note {
+            font-size: 14px;
+            font-style: italic;
+            margin-top: 5px;
+        }
+        .finish-btn {
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ToughBlackjackHustler</h1>
+
+        {% if recommendation %}
+        <div class="card-display">
+            {% for card in player_cards.split() %}
+            <div class="card">{{ card }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="card-display">
+            <div class="card dealer-card">{{ dealer_card }}</div>
+        </div>
+
+        <div class="recommendation
+            {% if recommendation == 'HIT' %}hit
+            {% elif recommendation == 'STAND' %}stand
+            {% endif %}">
+            Recommendation: {{ recommendation }}
+        </div>
+        {% endif %}
+
+        <form method="POST">
+            <div class="form-group">
+                <label for="decks_qty">Number of Decks (1-6):</label>
+                <input type="number" id="decks_qty" name="decks_qty" min="1" max="6" required placeholder="4" value="{{ decks_qty }}">
+            </div>
+
+            <div class="form-group">
+                <label for="player_cards">Your Cards (space separated):</label>
+                <input type="text" id="player_cards" name="player_cards" required placeholder="A 10" value="{{ player_cards }}">
+            </div>
+
+            <div class="form-group">
+                <label for="dealer_card">Dealer's Up Card:</label>
+                <input type="text" id="dealer_card" name="dealer_card" required placeholder="K" value="{{ dealer_card }}">
+            </div>
+
+            <div class="form-group">
+                <label for="used_cards">Used Cards (optional, space separated):</label>
+                <input type="text" id="used_cards" name="used_cards" value="{{ used_cards }}" placeholder="A K 10 5 J ...">
+                <div class="note">Enter cards already played if you want to look a specific point, else all cards will be in the deck</div>
+            </div>
+
+            <div class="actions">
+                <button type="submit">Get Recommendation</button>
+
+                {% if recommendation %}
+                <button type="submit" name="action" value="next" style="background-color: #6b6bff;">Next</button>
+                <button type="submit" name="action" value="finish" style="background-color: #ff6b6b;">Finish</button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</body>
+</html>

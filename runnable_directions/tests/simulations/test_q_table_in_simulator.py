@@ -1,7 +1,7 @@
 from agent.for_default_game import AgentForDefaultGameByQTable
 from environment.default_game import DefaultGame
 from learning_engine.q_learning import QTable
-from tests.simulations.game_simulator import GameSimulator
+from runnable_directions.tests.simulations.game_simulator import GameSimulator
 import time
 import os
 

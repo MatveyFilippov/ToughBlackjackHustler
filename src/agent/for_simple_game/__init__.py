@@ -1,0 +1,2 @@
+from .by_basic_strategy import AgentForSimpleGameByBasicStrategy
+from .by_q_table import AgentForSimpleGameByQTable, QTableStatesParserForSimpleGame

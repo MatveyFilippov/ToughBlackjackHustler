@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Training script for Q-Table in the Tough Blackjack Hustler project.
+Training script for Q-Table in the Tough Blackjack Hustler project with checkpoint support.
 """
 
 import argparse
 from datetime import datetime, timezone
+import json
 import logging
 from pathlib import Path
 from src.agent.for_simple_game import AgentForSimpleGameByQTable
@@ -22,7 +23,7 @@ def setup_logging(verbose: bool = False):
         lambda self, record, datefmt=None: (
             datetime
             .fromtimestamp(record.created, tz=timezone.utc)
-            .astimezone(datetime.now().tzinfo)
+            .astimezone()
             .isoformat(timespec='milliseconds')
         )
     )
@@ -33,6 +34,37 @@ def setup_logging(verbose: bool = False):
     )
 
 
+def save_checkpoint(q_table: QTable, episode: int, save_dir: Path):
+    """
+    Save a checkpoint of the Q-Table.
+
+    Args:
+        q_table: Q-Table to save
+        episode: Current episode number
+        save_dir: Directory to save checkpoints
+        prefix: Prefix for checkpoint files
+    """
+    save_dir.mkdir(parents=True, exist_ok=True)
+    base_name = f"checkpoint_ep{episode:05d}"
+
+    # Save Q-Table
+    checkpoint_path = save_dir / f"{base_name}.pkl"
+    q_table.save(str(checkpoint_path))
+
+    # Save metadata
+    metadata = {
+        "episode": episode,
+        "timestamp": datetime.now().astimezone().isoformat(timespec='milliseconds'),
+        "q_table_size": len(q_table),
+        "q_table_uuid": q_table.uuid,
+    }
+    metadata_path = save_dir / f"{base_name}_metadata.json"
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+
+    return checkpoint_path
+
+
 def train_q_table(
     episodes: int,
     card_decks_qty: int,
@@ -41,10 +73,12 @@ def train_q_table(
     gamma: float,
     epsilon: float,
     save_path: Path,
+    checkpoint_dir: Path | None = None,
+    checkpoint_interval: float = 0.05,
     verbose: bool = False,
 ) -> QTable:
     """
-    Train a Q-Table for the Simple Blackjack game.
+    Train a Q-Table for the Simple Blackjack game with checkpoint support.
 
     Args:
         episodes: Number of training episodes
@@ -54,6 +88,8 @@ def train_q_table(
         gamma: Discount factor
         epsilon: Exploration rate for epsilon-greedy
         save_path: Path to save the trained Q-Table
+        checkpoint_dir: Directory to save checkpoints (if None, no checkpoints saved)
+        checkpoint_interval: Interval for checkpoints (0.05 = 5%)
         verbose: Enable verbose logging
 
     Returns:
@@ -72,6 +108,9 @@ def train_q_table(
     log.info(f"Gamma (discount factor): {gamma}")
     log.info(f"Epsilon (exploration rate): {epsilon}")
     log.info(f"Save path: {save_path}")
+    if checkpoint_dir:
+        log.info(f"Checkpoint directory: {checkpoint_dir}")
+        log.info(f"Checkpoint interval: {checkpoint_interval * 100:.1f}%")
     log.info("=" * 60)
 
     # Create game environment
@@ -106,7 +145,22 @@ def train_q_table(
 
     # Training loop
     log.info("Starting training...")
+
+    # Progress reporting interval
     progress_interval = max(1, episodes // 20)  # Show progress every 5%
+
+    # Calculate checkpoint episodes
+    checkpoint_episodes = []
+    if checkpoint_dir:
+        checkpoint_interval_episodes = max(1, int(episodes * checkpoint_interval))
+        for ep in range(checkpoint_interval_episodes, episodes + 1, checkpoint_interval_episodes):
+            checkpoint_episodes.append(ep)
+        # Always save at the end
+        if episodes not in checkpoint_episodes:
+            checkpoint_episodes.append(episodes)
+        log.info(f"Will save checkpoints at episodes: {checkpoint_episodes[:5]}{'...' if len(checkpoint_episodes) > 5 else ''}")
+
+    start_time = datetime.now()
 
     for episode in range(1, episodes + 1):
         learner.run_train_iteration()
@@ -115,7 +169,22 @@ def train_q_table(
         if episode % progress_interval == 0 or episode == episodes:
             progress = (episode / episodes) * 100
             q_table_size = len(q_table)
-            log.info(f"Progress: {progress:.1f}% ({episode}/{episodes}) - Q-Table size: {q_table_size} states")
+            elapsed = (datetime.now() - start_time).total_seconds()
+            speed = episode / elapsed if elapsed > 0 else 0
+            log.info(
+                f"Progress: {progress:.1f}% ({episode}/{episodes}) - "
+                f"Q-Table size: {q_table_size} states - "
+                f"Speed: {speed:.1f} ep/s"
+            )
+
+        # Save checkpoint if needed
+        if checkpoint_dir and episode in checkpoint_episodes:
+            checkpoint_path = save_checkpoint(
+                q_table=q_table,
+                episode=episode,
+                save_dir=checkpoint_dir,
+            )
+            log.info(f"Checkpoint saved: {checkpoint_path}")
 
     log.info("Training completed!")
     log.info(f"Final Q-Table size: {len(q_table)} states")
@@ -125,8 +194,8 @@ def train_q_table(
         save_path.parent.mkdir(parents=True, exist_ok=True)
         q_table.save(str(save_path))
         log.info(f"Q-Table saved to {save_path}")
-    except Exception as ex:
-        log.error(f"Failed to save Q-Table: {ex}", exc_info=ex)
+    except Exception as e:
+        log.error(f"Failed to save Q-Table: {e}")
 
     return q_table
 
@@ -140,10 +209,12 @@ def continue_training(
     gamma: float,
     epsilon: float,
     save_path: Path | None = None,
+    checkpoint_dir: Path | None = None,
+    checkpoint_interval: float = 0.05,
     verbose: bool = False,
 ) -> QTable:
     """
-    Continue training an existing Q-Table.
+    Continue training an existing Q-Table with checkpoint support.
 
     Args:
         q_table_path: Path to existing Q-Table pickle file
@@ -154,6 +225,8 @@ def continue_training(
         gamma: Discount factor
         epsilon: Exploration rate
         save_path: Path to save the updated Q-Table (defaults to q_table_path)
+        checkpoint_dir: Directory to save checkpoints
+        checkpoint_interval: Interval for checkpoints (0.05 = 5%)
         verbose: Enable verbose logging
 
     Returns:
@@ -176,6 +249,9 @@ def continue_training(
     log.info(f"Gamma (discount factor): {gamma}")
     log.info(f"Epsilon (exploration rate): {epsilon}")
     log.info(f"Save path: {save_path}")
+    if checkpoint_dir:
+        log.info(f"Checkpoint directory: {checkpoint_dir}")
+        log.info(f"Checkpoint interval: {checkpoint_interval * 100:.1f}%")
     log.info("=" * 60)
 
     # Create game environment
@@ -211,14 +287,59 @@ def continue_training(
 
     # Training loop
     log.info("Starting training...")
+
+    # Progress reporting interval
     progress_interval = max(1, episodes // 20)  # Show progress every 5%
+
+    # Calculate checkpoint episodes
+    checkpoint_episodes = []
+    if checkpoint_dir:
+        checkpoint_interval_episodes = max(1, int(episodes * checkpoint_interval))
+        for ep in range(checkpoint_interval_episodes, episodes + 1, checkpoint_interval_episodes):
+            checkpoint_episodes.append(ep)
+        # Always save at the end
+        if episodes not in checkpoint_episodes:
+            checkpoint_episodes.append(episodes)
+        log.info(f"Will save checkpoints at episodes: {checkpoint_episodes[:5]}{'...' if len(checkpoint_episodes) > 5 else ''}")
+
+    # Find starting episode number from existing checkpoints
+    start_episode = 0
+    if checkpoint_dir and checkpoint_dir.exists():
+        existing_checkpoints = list(checkpoint_dir.glob("checkpoint_ep*.pkl"))
+        if existing_checkpoints:
+            # Extract episode numbers from filenames
+            import re
+            max_ep = 0
+            for f in existing_checkpoints:
+                match = re.search(r"checkpoint_ep(\d+)\.pkl", f.name)
+                if match:
+                    max_ep = max(max_ep, int(match.group(1)))
+            start_episode = max_ep
+            log.info(f"Found existing checkpoints, starting from episode {start_episode}")
+
+    start_time = datetime.now()
 
     for episode in range(1, episodes + 1):
         learner.run_train_iteration()
 
         if episode % progress_interval == 0 or episode == episodes:
             progress = (episode / episodes) * 100
-            log.info(f"Progress: {progress:.1f}% ({episode}/{episodes}) - Q-Table size: {len(q_table)} states")
+            elapsed = (datetime.now() - start_time).total_seconds()
+            speed = episode / elapsed if elapsed > 0 else 0
+            log.info(
+                f"Progress: {progress:.1f}% ({episode}/{episodes}) - "
+                f"Q-Table size: {len(q_table)} states - "
+                f"Speed: {speed:.1f} ep/s"
+            )
+
+        # Save checkpoint
+        if checkpoint_dir and episode in checkpoint_episodes:
+            checkpoint_path = save_checkpoint(
+                q_table=q_table,
+                episode=start_episode + episode,
+                save_dir=checkpoint_dir,
+            )
+            log.info(f"Checkpoint saved: {checkpoint_path}")
 
     log.info("Training completed!")
     log.info(f"Final Q-Table size: {len(q_table)} states")
@@ -386,6 +507,14 @@ def main():
         help="Dealer hits on soft 17",
     )
     train_parser.add_argument(
+        "-c", "--checkpoint-dir", type=Path, default=None,
+        help="Directory to save checkpoints (default: None - no checkpoints)"
+    )
+    train_parser.add_argument(
+        "--checkpoint-interval", type=float, default=0.05,
+        help="Checkpoint interval as fraction of total episodes (default: 0.05 = 5%%)"
+    )
+    train_parser.add_argument(
         "-v", "--verbose", action="store_true",
         help="Enable verbose logging",
     )
@@ -425,6 +554,14 @@ def main():
         help="Dealer hits on soft 17",
     )
     continue_parser.add_argument(
+        "-c", "--checkpoint-dir", type=Path, default=None,
+        help="Directory to save checkpoints (default: None - no checkpoints)"
+    )
+    continue_parser.add_argument(
+        "--checkpoint-interval", type=float, default=0.05,
+        help="Checkpoint interval as fraction of total episodes (default: 0.05 = 5%%)",
+    )
+    continue_parser.add_argument(
         "-v", "--verbose", action="store_true",
         help="Enable verbose logging",
     )
@@ -459,6 +596,8 @@ def main():
             gamma=args.gamma,
             epsilon=args.epsilon,
             save_path=args.save,
+            checkpoint_dir=args.checkpoint_dir,
+            checkpoint_interval=args.checkpoint_interval,
             verbose=args.verbose,
         )
 
@@ -472,6 +611,8 @@ def main():
             gamma=args.gamma,
             epsilon=args.epsilon,
             save_path=args.save,
+            checkpoint_dir=args.checkpoint_dir,
+            checkpoint_interval=args.checkpoint_interval,
             verbose=args.verbose,
         )
 

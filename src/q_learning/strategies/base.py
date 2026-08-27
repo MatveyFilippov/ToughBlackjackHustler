@@ -27,7 +27,9 @@ class QLearner(ABC):
             raise ValueError("Gamma must be in diapason [0-1]")
         self._GAMMA = gamma
 
-        self._Q_TABLE: QTable[GameStateType] = q_table if q_table else QTable(*game_environment.available_actions)
+        if q_table is None:
+            q_table = QTable(*game_environment.available_actions)
+        self._Q_TABLE: QTable[GameStateType] = q_table
         self._GAME_ENVIRONMENT = game_environment
 
     @property

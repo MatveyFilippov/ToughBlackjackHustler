@@ -4,9 +4,10 @@ Training script for Q-Table in the Tough Blackjack Hustler project.
 """
 
 import argparse
-import datetime
+from datetime import datetime, timezone
 import logging
 from pathlib import Path
+from src.agent.for_simple_game import AgentForSimpleGameByQTable
 from src.environment.base import GameActionResult
 from src.environment.games.simple import SimpleGame
 from src.q_learning import QTable
@@ -14,13 +15,14 @@ from src.q_learning.strategies import EpsilonGreedyQLearner
 from src.q_learning.strategies.base import QLearnerRewardAfterAction
 
 
-def setup_logging(verbose: bool):
+def setup_logging(verbose: bool = False):
     """Configure logging for the training process."""
     level = logging.DEBUG if verbose else logging.INFO
     logging.Formatter.formatTime = (
         lambda self, record, datefmt=None: (
-            datetime.datetime
-            .fromtimestamp(record.created, tz=datetime.timezone.utc)
+            datetime
+            .fromtimestamp(record.created, tz=timezone.utc)
+            .astimezone(datetime.now().tzinfo)
             .isoformat(timespec='milliseconds')
         )
     )
@@ -28,7 +30,6 @@ def setup_logging(verbose: bool):
         encoding="UTF-8",
         level=level,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
-        datefmt='%Y-%m-%d %H:%M:%S',
     )
 
 
@@ -40,7 +41,7 @@ def train_q_table(
     gamma: float,
     epsilon: float,
     save_path: Path,
-    verbose: bool,
+    verbose: bool = False,
 ) -> QTable:
     """
     Train a Q-Table for the Simple Blackjack game.
@@ -124,8 +125,8 @@ def train_q_table(
         save_path.parent.mkdir(parents=True, exist_ok=True)
         q_table.save(str(save_path))
         log.info(f"Q-Table saved to {save_path}")
-    except Exception as e:
-        log.error(f"Failed to save Q-Table: {e}")
+    except Exception as ex:
+        log.error(f"Failed to save Q-Table: {ex}", exc_info=ex)
 
     return q_table
 
@@ -138,8 +139,8 @@ def continue_training(
     alpha: float,
     gamma: float,
     epsilon: float,
-    verbose: bool,
     save_path: Path | None = None,
+    verbose: bool = False,
 ) -> QTable:
     """
     Continue training an existing Q-Table.
@@ -166,12 +167,16 @@ def continue_training(
 
     log.info("=" * 60)
     log.info("Continuing Q-Table Training")
-    log.info("=" * 60)
     log.info(f"Loading from: {q_table_path}")
-
-    # Load existing Q-Table
-    q_table = QTable.load(str(q_table_path))
-    log.info(f"Loaded Q-Table with {len(q_table)} states")
+    log.info("=" * 60)
+    log.info(f"Episodes: {episodes}")
+    log.info(f"Card Decks: {card_decks_qty}")
+    log.info(f"Dealer Hits Soft 17: {dealer_hit_on_soft_17}")
+    log.info(f"Alpha (learning rate): {alpha}")
+    log.info(f"Gamma (discount factor): {gamma}")
+    log.info(f"Epsilon (exploration rate): {epsilon}")
+    log.info(f"Save path: {save_path}")
+    log.info("=" * 60)
 
     # Create game environment
     game = SimpleGame(
@@ -179,7 +184,8 @@ def continue_training(
         dealer_hit_on_soft_17=dealer_hit_on_soft_17,
     )
 
-    # Define rewards
+    # Define rewards for each action result
+    # Blackjack pays 3:2, wins pay 1:1, pushes return the bet, losses lose the bet
     rewards = {
         GameActionResult.WAIT_ACTION: QLearnerRewardAfterAction(0.0),
         GameActionResult.BLACKJACK: QLearnerRewardAfterAction(1.5),
@@ -188,6 +194,10 @@ def continue_training(
         GameActionResult.LOSS: QLearnerRewardAfterAction(-1.0),
         GameActionResult.BUST: QLearnerRewardAfterAction(-1.0),
     }
+
+    # Load existing Q-Table
+    q_table = QTable.load(str(q_table_path))
+    log.info(f"Loaded Q-Table with {len(q_table)} states")
 
     # Create Q-Learner with the existing Q-Table
     learner = EpsilonGreedyQLearner(
@@ -199,7 +209,8 @@ def continue_training(
         q_table=q_table,
     )
 
-    log.info(f"Training for {episodes} additional episodes...")
+    # Training loop
+    log.info("Starting training...")
     progress_interval = max(1, episodes // 20)  # Show progress every 5%
 
     for episode in range(1, episodes + 1):
@@ -217,13 +228,18 @@ def continue_training(
         save_path.parent.mkdir(parents=True, exist_ok=True)
         q_table.save(str(save_path))
         log.info(f"Updated Q-Table saved to {save_path}")
-    except Exception as e:
-        log.error(f"Failed to save Q-Table: {e}")
+    except Exception as ex:
+        log.error(f"Failed to save Q-Table: {ex}", exc_info=ex)
 
     return q_table
 
 
-def evaluate_q_table(q_table_path: Path, num_rounds: int = 1000, card_decks_qty: int = 6, verbose: bool = False):
+def evaluate_q_table(
+    q_table_path: Path,
+    num_rounds: int,
+    card_decks_qty: int,
+    verbose: bool = False,
+) -> dict[str, float]:
     """
     Evaluate the performance of a trained Q-Table.
 
@@ -241,8 +257,11 @@ def evaluate_q_table(q_table_path: Path, num_rounds: int = 1000, card_decks_qty:
 
     log.info("=" * 60)
     log.info("Evaluating Q-Table Performance")
-    log.info("=" * 60)
     log.info(f"Loading from: {q_table_path}")
+    log.info("=" * 60)
+    log.info(f"Number of rounds: {num_rounds}")
+    log.info(f"Card Decks: {card_decks_qty}")
+    log.info("=" * 60)
 
     # Load Q-Table
     q_table = QTable.load(str(q_table_path))
@@ -251,20 +270,17 @@ def evaluate_q_table(q_table_path: Path, num_rounds: int = 1000, card_decks_qty:
     # Create game
     game = SimpleGame(card_decks_qty=card_decks_qty)
 
-    # Import the agent
-    from src.agent.for_simple_game.by_q_table import AgentForSimpleGameByQTable
-
     # Create agent with the Q-Table
     agent = AgentForSimpleGameByQTable(q_table)
 
     # Statistics
     results = {
-        "wins": 0,
-        "losses": 0,
-        "pushes": 0,
-        "blackjacks": 0,
-        "busts": 0,
-        "total_rounds": 0,
+        "wins": 0.0,
+        "losses": 0.0,
+        "pushes": 0.0,
+        "blackjacks": 0.0,
+        "busts": 0.0,
+        "total_rounds": 0.0,
     }
 
     log.info(f"Evaluating over {num_rounds} rounds...")
@@ -316,7 +332,7 @@ def evaluate_q_table(q_table_path: Path, num_rounds: int = 1000, card_decks_qty:
     log.info(f"  Blackjacks: {results['blackjacks']} ({blackjack_rate:.1f}%)")
     log.info(f"  Busts: {results['busts']} ({bust_rate:.1f}%)")
 
-    # Calculate expected value (assuming $1 bet)
+    # Calculate expected value
     expected_value = (
                              results["wins"] * 1.0 +
                              results["blackjacks"] * 1.5 +
